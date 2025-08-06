@@ -1,0 +1,42 @@
+name: PR Conflict Checker
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: 'GitHub repository URL to check'
+        required: true
+      base_branch:
+        description: 'Base branch to check PRs against (optional)'
+        required: false
+
+jobs:
+  check-conflicts:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout current repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run PR conflict checker
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python pr_conflict_check.py \
+          "${{ github.event.inputs.repo_url }}" \
+          "$GITHUB_TOKEN" \
+          ${{ github.event.inputs.base_branch && format('--base-branch {0}', github.event.inputs.base_branch) || '' }}
+
+    - name: Upload conflict matrix
+      uses: actions/upload-artifact@v4
+      with:
+        name: conflict-matrix
+        path: conflict_matrix.png

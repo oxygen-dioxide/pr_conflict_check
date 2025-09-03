@@ -84,7 +84,7 @@ logFile = open('subprocess_log.txt', 'a', encoding="utf8")
 def run_subprocess_and_log(cmd):
     """Run subprocess command, log subprocess command and its output to a file"""
     global logFile
-    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
     returncode = result.returncode
     output = result.stdout
     error = result.stderr

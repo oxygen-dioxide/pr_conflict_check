@@ -80,18 +80,18 @@ def get_open_prs(github_client, owner, repo, base_branch=None):
 
 def run_subprocess_and_log(cmd):
     """Run subprocess command, log subprocess command and its output to a file"""
+    global logFile
     result = subprocess.run(cmd, check=True, capture_output=True, text=True)
     returncode = result.returncode
     output = result.stdout
     error = result.stderr
-    with open('subprocess_log.txt', 'a', encoding="utf8") as f:
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logFile.write(f"\n[{timestamp}] Command: {' '.join(cmd)}\n")
-        logFile.write(f"Return Code:{returncode}")
-        if output:
-            logFile.write(f"Output:\n{output}\n")
-        if error:
-            logFile.write(f"Error:\n{error}\n")
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    logFile.write(f"\n[{timestamp}] Command: {' '.join(cmd)}\n")
+    logFile.write(f"Return Code:{returncode}")
+    if output:
+        logFile.write(f"Output:\n{output}\n")
+    if error:
+        logFile.write(f"Error:\n{error}\n")
     return result
 
 def clone_repo(repo_url, clone_dir):

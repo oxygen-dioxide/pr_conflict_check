@@ -202,7 +202,7 @@ def visualize_conflicts(prs, conflict_matrix, output_file):
 def get_default_branch(repo_dir):
     """Get the default branch of the repository"""
     with pushd(repo_dir):
-        run_subprocess_and_log(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'])
+        result = run_subprocess_and_log(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'])
         # Extract branch name from refs/remotes/origin/<branch>
         return result.stdout.strip().split('/')[-1]
 

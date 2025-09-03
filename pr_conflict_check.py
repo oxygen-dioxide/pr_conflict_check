@@ -21,6 +21,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from github import Github
 from github.GithubException import GithubException
+from contextlib import contextmanager
+
+
+@contextmanager
+def pushd(new_dir):
+    previous_dir = os.getcwd()
+    os.chdir(new_dir)
+    try:
+        yield
+    finally:
+        os.chdir(previous_dir)
 
 def parse_args():
     """Parse command line arguments"""
@@ -53,37 +64,49 @@ def get_open_prs(github_client, owner, repo, base_branch=None):
     repo_obj = github_client.get_repo(f"{owner}/{repo}")
     prs = repo_obj.get_pulls(state='open')
 
-    # Filter PRs targeting the specified base branch
-    if base_branch:
-        prs = [pr for pr in prs if pr.base.ref == base_branch and not pr.draft]
-    else:
-        prs = [pr for pr in prs if not pr.draft]
+    # Filter PRs targeting the specified base branch and not already conflicting
+    filtered_prs = []
+    for pr in prs:
+        if pr.draft:
+            continue
+        if base_branch and pr.base.ref != base_branch:
+            continue
+        if pr.mergeable is False:  # Skip PRs that are already conflicting
+            continue
+        filtered_prs.append(pr)
 
-    return prs
+    return filtered_prs
 
 def clone_repo(repo_url, clone_dir):
     """Clone repository to local directory"""
     subprocess.run(['git', 'clone', repo_url, clone_dir], check=True)
 
-def checkout_pr_branch(repo_dir, pr_branch):
-    """Checkout a PR branch"""
-    os.chdir(repo_dir)
-    subprocess.run(['git', 'checkout', pr_branch], check=True)
-
 def merge_branches(repo_dir, base_branch, target_branch):
     """Attempt to merge target branch into base branch"""
-    os.chdir(repo_dir)
-    # First checkout base branch
-    subprocess.run(['git', 'checkout', base_branch], check=True)
-    # Attempt merge
-    result = subprocess.run(['git', 'merge', target_branch],
-                          capture_output=True, text=True)
-    return result.returncode == 0  # True if merge successful
+    with pushd(repo_dir):
+        # First checkout base branch
+        subprocess.run(['git', 'checkout', base_branch], check=True)
+        # Attempt merge
+        result = subprocess.run(['git', 'merge', target_branch],
+                            capture_output=True, text=True)
+        return result.returncode == 0  # True if merge successful
+
+def fetch_pr_branches(repo_dir, prs):
+    """Fetch all PR branches to local repository"""
+    with pushd(repo_dir):
+        for pr in prs:
+            branch_name = pr.head.ref
+            # Fetch the PR branch
+            subprocess.run(['git', 'fetch', 'origin', f"{branch_name}:{branch_name}"],
+                          capture_output=True, check=True)
 
 def detect_conflicts(repo_dir, prs):
-    """Detect conflicts between PRs using git merge"""
+    """Detect conflicts between PRs using git merge with temporary branches"""
     conflict_matrix = []
     pr_branches = [pr.head.ref for pr in prs]
+
+    # First fetch all PR branches
+    fetch_pr_branches(repo_dir, prs)
 
     for i, pr1 in enumerate(prs):
         row = []
@@ -92,16 +115,37 @@ def detect_conflicts(repo_dir, prs):
                 row.append(False)  # No self-conflict
                 continue
 
-            # Try merging pr2 into pr1
-            try:
-                # Clean any previous merge state
-                os.chdir(repo_dir)
-                subprocess.run(['git', 'merge', '--abort'],
-                             capture_output=True, check=False)
-                subprocess.run(['git', 'checkout', pr1.head.ref], check=True)
+            # Create a unique temporary branch name
+            temp_branch = f"temp_conflict_check_{i}_{j}"
 
-                merge_success = merge_branches(repo_dir, pr1.head.ref, pr2.head.ref)
-                row.append(not merge_success)  # True if conflict (merge failed)
+            try:
+                with pushd(repo_dir):
+                    # Clean any previous merge state
+                    subprocess.run(['git', 'merge', '--abort'],
+                                 capture_output=True, check=False)
+
+                    # Create temporary branch from base
+                    subprocess.run(['git', 'checkout', '-b', temp_branch, pr1.base.ref],
+                                 capture_output=True, check=True)
+
+                    # First merge pr1
+                    merge1_result = subprocess.run(['git', 'merge', pr1.head.ref],
+                                               capture_output=True, text=True)
+
+                    # Then merge pr2
+                    merge2_result = subprocess.run(['git', 'merge', pr2.head.ref],
+                                               capture_output=True, text=True)
+
+                    # Check if second merge had conflicts
+                    merge_success = merge2_result.returncode == 0
+                    row.append(not merge_success)  # True if conflict (merge failed)
+
+                    # Clean up
+                    subprocess.run(['git', 'checkout', pr1.base.ref],
+                                 capture_output=True, check=True)
+                    subprocess.run(['git', 'branch', '-D', temp_branch],
+                                 capture_output=True, check=True)
+
             except subprocess.CalledProcessError:
                 row.append(True)  # Assume conflict if any error occurs
 
@@ -138,11 +182,11 @@ def visualize_conflicts(prs, conflict_matrix, output_file):
 
 def get_default_branch(repo_dir):
     """Get the default branch of the repository"""
-    os.chdir(repo_dir)
-    result = subprocess.run(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
-                          capture_output=True, text=True, check=True)
-    # Extract branch name from refs/remotes/origin/<branch>
-    return result.stdout.strip().split('/')[-1]
+    with pushd(repo_dir):
+        result = subprocess.run(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
+                            capture_output=True, text=True, check=True)
+        # Extract branch name from refs/remotes/origin/<branch>
+        return result.stdout.strip().split('/')[-1]
 
 def main():
     """Main function"""

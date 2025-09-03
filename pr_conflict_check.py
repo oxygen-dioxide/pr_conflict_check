@@ -90,7 +90,7 @@ def run_subprocess_and_log(cmd):
     error = result.stderr
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     logFile.write(f"\n[{timestamp}] Command: {' '.join(cmd)}\n")
-    logFile.write(f"Return Code:{returncode}")
+    logFile.write(f"Return Code:{returncode}\n")
     if output:
         logFile.write(f"Output:\n{output}\n")
     if error:
@@ -249,3 +249,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    logFile.close()

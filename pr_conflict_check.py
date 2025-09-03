@@ -95,26 +95,23 @@ def fetch_pr_branches(repo_dir, prs):
     """Fetch all PR branches to local repository, handling forks"""
     with pushd(repo_dir):
         for pr in prs:
-            branch_name = pr.head.ref
+            # Use PR_<number> as the local branch name for all PRs
+            local_branch = f"PR_{pr.number}"
+
             # Check if this is a fork (different repo)
             if pr.head.repo.full_name != pr.base.repo.full_name:
                 # For forks, we need to fetch from the fork's URL
                 fork_url = pr.head.repo.clone_url
-                # Use a unique local branch name to avoid conflicts
-                local_branch = f"fork_{pr.number}_{branch_name}"
-                subprocess.run(['git', 'fetch', fork_url, f"{branch_name}:{local_branch}"],
+                subprocess.run(['git', 'fetch', fork_url, f"{pr.head.ref}:{local_branch}"],
                               capture_output=True, check=True)
             else:
                 # For same repo, fetch normally
-                subprocess.run(['git', 'fetch', 'origin', f"{branch_name}:{branch_name}"],
+                subprocess.run(['git', 'fetch', 'origin', f"{pr.head.ref}:{local_branch}"],
                               capture_output=True, check=True)
 
 def get_branch_name(pr):
-    """Get the local branch name for a PR, handling forks"""
-    if pr.head.repo.full_name != pr.base.repo.full_name:
-        # For forks, use the special naming pattern
-        return f"fork_{pr.number}_{pr.head.ref}"
-    return pr.head.ref
+    """Get the local branch name for a PR"""
+    return f"PR_{pr.number}"
 
 def detect_conflicts(repo_dir, prs):
     """Detect conflicts between PRs using git merge with temporary branches"""

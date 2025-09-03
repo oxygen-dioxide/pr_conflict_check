@@ -78,6 +78,9 @@ def get_open_prs(github_client, owner, repo, base_branch=None):
 
     return filtered_prs
 
+
+logFile = open('subprocess_log.txt', 'a', encoding="utf8")
+
 def run_subprocess_and_log(cmd):
     """Run subprocess command, log subprocess command and its output to a file"""
     global logFile

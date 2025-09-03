@@ -22,6 +22,7 @@ import numpy as np
 from github import Github
 from github.GithubException import GithubException
 from contextlib import contextmanager
+from datetime import datetime
 
 
 @contextmanager
@@ -77,19 +78,35 @@ def get_open_prs(github_client, owner, repo, base_branch=None):
 
     return filtered_prs
 
+def log_subprocess_command(cmd, output=None, error=None):
+    """Log subprocess command and its output to a file"""
+    with open('subprocess_log.txt', 'a', encoding="utf8") as f:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f.write(f"\n[{timestamp}] Command: {' '.join(cmd)}\n")
+        if output:
+            f.write(f"Output:\n{output}\n")
+        if error:
+            f.write(f"Error:\n{error}\n")
+
 def clone_repo(repo_url, clone_dir):
     """Clone repository to local directory"""
-    subprocess.run(['git', 'clone', repo_url, clone_dir], check=True)
+    cmd = ['git', 'clone', repo_url, clone_dir]
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    log_subprocess_command(cmd, result.stdout, result.stderr)
 
 def merge_branches(repo_dir, base_branch, target_branch):
     """Attempt to merge target branch into base branch"""
     with pushd(repo_dir):
         # First checkout base branch
-        subprocess.run(['git', 'checkout', base_branch], check=True)
+        cmd1 = ['git', 'checkout', base_branch]
+        result1 = subprocess.run(cmd1, check=True, capture_output=True, text=True)
+        log_subprocess_command(cmd1, result1.stdout, result1.stderr)
+
         # Attempt merge
-        result = subprocess.run(['git', 'merge', target_branch],
-                            capture_output=True, text=True)
-        return result.returncode == 0  # True if merge successful
+        cmd2 = ['git', 'merge', target_branch]
+        result2 = subprocess.run(cmd2, capture_output=True, text=True)
+        log_subprocess_command(cmd2, result2.stdout, result2.stderr)
+        return result2.returncode == 0  # True if merge successful
 
 def fetch_pr_branches(repo_dir, prs):
     """Fetch all PR branches to local repository, handling forks"""
@@ -102,12 +119,14 @@ def fetch_pr_branches(repo_dir, prs):
             if pr.head.repo.full_name != pr.base.repo.full_name:
                 # For forks, we need to fetch from the fork's URL
                 fork_url = pr.head.repo.clone_url
-                subprocess.run(['git', 'fetch', fork_url, f"{pr.head.ref}:{local_branch}"],
-                              capture_output=True, check=True)
+                cmd = ['git', 'fetch', fork_url, f"{pr.head.ref}:{local_branch}"]
+                result = subprocess.run(cmd, capture_output=True, check=True, text=True)
+                log_subprocess_command(cmd, result.stdout, result.stderr)
             else:
                 # For same repo, fetch normally
-                subprocess.run(['git', 'fetch', 'origin', f"{pr.head.ref}:{local_branch}"],
-                              capture_output=True, check=True)
+                cmd = ['git', 'fetch', 'origin', f"{pr.head.ref}:{local_branch}"]
+                result = subprocess.run(cmd, capture_output=True, check=True, text=True)
+                log_subprocess_command(cmd, result.stdout, result.stderr)
 
 def get_branch_name(pr):
     """Get the local branch name for a PR"""
@@ -137,30 +156,36 @@ def detect_conflicts(repo_dir, prs):
             try:
                 with pushd(repo_dir):
                     # Clean any previous merge state
-                    subprocess.run(['git', 'merge', '--abort'],
-                                 capture_output=True, check=False)
+                    cmd1 = ['git', 'merge', '--abort']
+                    subprocess.run(cmd1, capture_output=True, check=False)
 
                     # Create temporary branch from base
-                    subprocess.run(['git', 'checkout', '-b', temp_branch, pr1.base.ref],
-                                 capture_output=True, check=True)
+                    cmd2 = ['git', 'checkout', '-b', temp_branch, pr1.base.ref]
+                    result2 = subprocess.run(cmd2, capture_output=True, check=True, text=True)
+                    log_subprocess_command(cmd2, result2.stdout, result2.stderr)
 
                     # First merge pr1
-                    merge1_result = subprocess.run(['git', 'merge', branch1],
-                                               capture_output=True, text=True)
+                    cmd3 = ['git', 'merge', branch1]
+                    result3 = subprocess.run(cmd3, capture_output=True, text=True)
+                    log_subprocess_command(cmd3, result3.stdout, result3.stderr)
 
                     # Then merge pr2
-                    merge2_result = subprocess.run(['git', 'merge', branch2],
-                                               capture_output=True, text=True)
+                    cmd4 = ['git', 'merge', branch2]
+                    result4 = subprocess.run(cmd4, capture_output=True, text=True)
+                    log_subprocess_command(cmd4, result4.stdout, result4.stderr)
 
                     # Check if second merge had conflicts
-                    merge_success = merge2_result.returncode == 0
+                    merge_success = result4.returncode == 0
                     row.append(not merge_success)  # True if conflict (merge failed)
 
                     # Clean up
-                    subprocess.run(['git', 'checkout', pr1.base.ref],
-                                 capture_output=True, check=True)
-                    subprocess.run(['git', 'branch', '-D', temp_branch],
-                                 capture_output=True, check=True)
+                    cmd5 = ['git', 'checkout', pr1.base.ref]
+                    result5 = subprocess.run(cmd5, capture_output=True, check=True, text=True)
+                    log_subprocess_command(cmd5, result5.stdout, result5.stderr)
+
+                    cmd6 = ['git', 'branch', '-D', temp_branch]
+                    result6 = subprocess.run(cmd6, capture_output=True, check=True, text=True)
+                    log_subprocess_command(cmd6, result6.stdout, result6.stderr)
 
             except subprocess.CalledProcessError:
                 row.append(True)  # Assume conflict if any error occurs
@@ -199,8 +224,9 @@ def visualize_conflicts(prs, conflict_matrix, output_file):
 def get_default_branch(repo_dir):
     """Get the default branch of the repository"""
     with pushd(repo_dir):
-        result = subprocess.run(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
-                            capture_output=True, text=True, check=True)
+        cmd = ['git', 'symbolic-ref', 'refs/remotes/origin/HEAD']
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        log_subprocess_command(cmd, result.stdout, result.stderr)
         # Extract branch name from refs/remotes/origin/<branch>
         return result.stdout.strip().split('/')[-1]
 

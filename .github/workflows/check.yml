@@ -40,3 +40,10 @@ jobs:
       with:
         name: conflict-matrix
         path: conflict_matrix.png
+        
+    - name: Upload log file
+      uses: actions/upload-artifact@v4
+      with:
+        name: log
+        path: subprocess_log.txt
+        

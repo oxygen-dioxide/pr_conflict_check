@@ -18,7 +18,8 @@ jobs:
     - name: Checkout current repo
       uses: actions/checkout@v4
     
-    - uses: fregante/setup-git-user@v2
+    - run: git config --global user.email "you@example.com"
+    - run: git config --global user.name "Your Name"
 
     - name: Set up Python
       uses: actions/setup-python@v5

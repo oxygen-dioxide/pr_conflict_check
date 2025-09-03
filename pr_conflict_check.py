@@ -143,30 +143,26 @@ def detect_conflicts(repo_dir, prs):
             # Create a unique temporary branch name
             temp_branch = f"temp_conflict_check_{i}_{j}"
 
-            try:
-                with pushd(repo_dir):
-                    # Clean any previous merge state
-                    run_subprocess_and_log(['git', 'merge', '--abort'])
+            with pushd(repo_dir):
+                # Clean any previous merge state
+                run_subprocess_and_log(['git', 'merge', '--abort'])
 
-                    # Create temporary branch from base
-                    run_subprocess_and_log(['git', 'checkout', '-b', temp_branch, pr1.base.ref])
+                # Create temporary branch from base
+                run_subprocess_and_log(['git', 'checkout', '-b', temp_branch, pr1.base.ref])
 
-                    # First merge pr1
-                    run_subprocess_and_log(['git', 'merge', branch1])
+                # First merge pr1
+                run_subprocess_and_log(['git', 'merge', branch1])
 
-                    # Then merge pr2
-                    merge_result = run_subprocess_and_log(['git', 'merge', branch2])
+                # Then merge pr2
+                merge_result = run_subprocess_and_log(['git', 'merge', branch2])
 
-                    # Check if second merge had conflicts
-                    merge_success = merge_result.returncode == 0
-                    row.append(not merge_success)  # True if conflict (merge failed)
+                # Check if second merge had conflicts
+                merge_success = merge_result.returncode == 0
+                row.append(not merge_success)  # True if conflict (merge failed)
 
-                    # Clean up
-                    run_subprocess_and_log(['git', 'checkout', pr1.base.ref])
-                    run_subprocess_and_log(['git', 'branch', '-D', temp_branch])
-
-            except subprocess.CalledProcessError:
-                row.append(True)  # Assume conflict if any error occurs
+                # Clean up
+                run_subprocess_and_log(['git', 'checkout', pr1.base.ref])
+                run_subprocess_and_log(['git', 'branch', '-D', temp_branch])
 
         conflict_matrix.append(row)
 

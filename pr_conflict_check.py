@@ -92,9 +92,9 @@ def run_subprocess_and_log(cmd):
     logFile.write(f"\n[{timestamp}] Command: {' '.join(cmd)}\n")
     logFile.write(f"Return Code:{returncode}\n")
     if output:
-        logFile.write(f"Output:\n{output}\n")
+        logFile.write(f"Stdout:\n{output}\n")
     if error:
-        logFile.write(f"Error:\n{error}\n")
+        logFile.write(f"Stderr:\n{error}\n")
     return result
 
 def clone_repo(repo_url, clone_dir):
@@ -181,9 +181,6 @@ def visualize_conflicts(prs, conflict_matrix, output_file):
     ax.set_yticks(range(n))
     ax.set_xticklabels([f"#{pr.number}" for pr in prs], rotation=90)
     ax.set_yticklabels([f"#{pr.number}" for pr in prs])
-
-    # Add colorbar
-    fig.colorbar(cax)
 
     # Add title and labels
     plt.title('PR Conflict Matrix')
